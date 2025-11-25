@@ -1,0 +1,55 @@
+import type {
+  ICredentialType,
+  INodeProperties,
+} from 'n8n-workflow';
+
+export class ReveniumOpenAI implements ICredentialType {
+  name = 'reveniumOpenAI';
+
+  displayName = 'Revenium OpenAI Credentials';
+
+  icon = 'file:ReveniumOpenAIChatModel/ReveniumOpenAI-v2.png' as const;
+
+  documentationUrl = 'https://github.com/revenium/revenium-middleware-openai-n8n';
+
+  properties: INodeProperties[] = [
+    {
+      displayName: 'OpenAI API Key',
+      name: 'openaiApiKey',
+      type: 'string',
+      typeOptions: {
+        password: true,
+      },
+      default: '',
+      required: true,
+      description: 'Your OpenAI API key for accessing ChatCompletion endpoints',
+    },
+    {
+      displayName: 'OpenAI Base URL',
+      name: 'openaiBaseUrl',
+      type: 'string',
+      default: 'https://api.openai.com/v1',
+      required: false,
+      description: 'The base URL for OpenAI API (default: https://api.openai.com/v1)',
+    },
+    {
+      displayName: 'Revenium Metering API Key',
+      name: 'reveniumApiKey',
+      type: 'string',
+      typeOptions: {
+        password: true,
+      },
+      default: '',
+      required: true,
+      description: 'Your Revenium API key for tracking usage and costs',
+    },
+    {
+      displayName: 'Revenium Metering Base URL',
+      name: 'reveniumBaseUrl',
+      type: 'string',
+      required: true,
+      default: 'https://api.revenium.ai',
+      description: 'Revenium API base URL (default: https://api.revenium.ai)',
+    },
+  ];
+}
