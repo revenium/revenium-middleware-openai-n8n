@@ -2,13 +2,21 @@
  * Core utility functions for Revenium middleware
  */
 
-import { ALLOWED_REVENIUM_BASE_URLS, ALLOWED_OPENAI_BASE_URLS, DEFAULT_BATCH_CONFIG, reveniumCircuitBreaker, DEFAULT_CIRCUIT_BREAKER_CONFIG, DEFAULT_RATE_LIMIT_CONFIG, rateLimitState } from '../constants/constants.js';
+import {
+  ALLOWED_REVENIUM_BASE_URLS,
+  ALLOWED_OPENAI_BASE_URLS,
+  DEFAULT_BATCH_CONFIG,
+  reveniumCircuitBreaker,
+  DEFAULT_CIRCUIT_BREAKER_CONFIG,
+  DEFAULT_RATE_LIMIT_CONFIG,
+  rateLimitState,
+} from '../constants/constants.js';
 import {
   MODEL_INVOCATION_TIMEOUT,
   TOOL_EXECUTION_TIMEOUT,
   STREAM_TIMEOUT,
   API_TIMEOUT,
-  getTimeoutFromEnv
+  getTimeoutFromEnv,
 } from '../constants/timeouts.js';
 import type {
   OpenAIFinishReason,
@@ -27,6 +35,14 @@ import type {
 
 import { logger } from './logger.js';
 
+export {
+  extractPrompts,
+  shouldCapturePrompts,
+  sanitizeCredentials,
+  getMaxPromptSize,
+  type PromptData,
+} from './prompt-extraction.js';
+
 /**
  * Configuration for timeout values
  */
@@ -42,8 +58,14 @@ export interface TimeoutConfig {
  */
 export function getTimeoutConfig(): TimeoutConfig {
   return {
-    modelInvocation: getTimeoutFromEnv('REVENIUM_MODEL_TIMEOUT', MODEL_INVOCATION_TIMEOUT),
-    toolExecution: getTimeoutFromEnv('REVENIUM_TOOL_TIMEOUT', TOOL_EXECUTION_TIMEOUT),
+    modelInvocation: getTimeoutFromEnv(
+      'REVENIUM_MODEL_TIMEOUT',
+      MODEL_INVOCATION_TIMEOUT
+    ),
+    toolExecution: getTimeoutFromEnv(
+      'REVENIUM_TOOL_TIMEOUT',
+      TOOL_EXECUTION_TIMEOUT
+    ),
     streamTimeout: getTimeoutFromEnv('REVENIUM_STREAM_TIMEOUT', STREAM_TIMEOUT),
     apiTimeout: getTimeoutFromEnv('REVENIUM_API_TIMEOUT', API_TIMEOUT),
   };
@@ -59,16 +81,16 @@ export function generateCorrelationId(): string {
 /**
  * Global batch queue for Revenium requests
  */
-  let batchQueue: BatchedRequest[] = [];
-  let batchTimer: ReturnType<typeof setTimeout> | null = null;
-  let isProcessingBatch = false;
+let batchQueue: BatchedRequest[] = [];
+let batchTimer: ReturnType<typeof setTimeout> | null = null;
+let isProcessingBatch = false;
 
-  /**
-   * Sleep for specified milliseconds
-   */
-  function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+/**
+ * Sleep for specified milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /**
  * Check if circuit breaker should allow the request
@@ -80,7 +102,10 @@ function shouldAllowRequest(config: CircuitBreakerConfig): boolean {
     case 'CLOSED':
       return true;
     case 'OPEN':
-      if (now - reveniumCircuitBreaker.lastFailureTime > config.recoveryTimeoutMs) {
+      if (
+        now - reveniumCircuitBreaker.lastFailureTime >
+        config.recoveryTimeoutMs
+      ) {
         reveniumCircuitBreaker.state = 'HALF_OPEN';
         return true;
       }
@@ -109,7 +134,10 @@ function recordFailure(config: CircuitBreakerConfig): void {
 
   if (reveniumCircuitBreaker.failures >= config.failureThreshold) {
     reveniumCircuitBreaker.state = 'OPEN';
-    logger.warning('Revenium API circuit breaker opened due to %d failures', reveniumCircuitBreaker.failures);
+    logger.warning(
+      'Revenium API circuit breaker opened due to %d failures',
+      reveniumCircuitBreaker.failures
+    );
   }
 }
 
@@ -159,7 +187,10 @@ async function processBatchGroup(requests: BatchedRequest[]): Promise<void> {
 
   // Check circuit breaker for this config
   if (!shouldAllowRequest(circuitBreakerConfig)) {
-    logger.warning('Revenium API circuit breaker is open, rejecting batch of %d requests', requests.length);
+    logger.warning(
+      'Revenium API circuit breaker is open, rejecting batch of %d requests',
+      requests.length
+    );
     requests.forEach(item => {
       item.reject(new Error('Circuit breaker is open'));
     });
@@ -168,15 +199,24 @@ async function processBatchGroup(requests: BatchedRequest[]): Promise<void> {
 
   // For now, process requests individually but in parallel
   // Future enhancement: implement true batch API endpoint
-  const promises = requests.map(async (item) => {
+  const promises = requests.map(async item => {
     try {
-      await createCompletionWithRetry(item.request, config, circuitBreakerConfig);
-      logger.debug('Batch request completed successfully for transaction: %s', item.request.transactionId);
+      await createCompletionWithRetry(
+        item.request,
+        config,
+        circuitBreakerConfig
+      );
+      logger.debug(
+        'Batch request completed successfully for transaction: %s',
+        item.request.transactionId
+      );
       item.resolve();
     } catch (error) {
-      logger.error('Batch request failed for transaction %s: %s',
+      logger.error(
+        'Batch request failed for transaction %s: %s',
         item.request.transactionId,
-        error instanceof Error ? error.message : String(error));
+        error instanceof Error ? error.message : String(error)
+      );
       logger.debug('Full batch error details: %O', error);
       item.reject(error);
     }
@@ -217,7 +257,10 @@ function scheduleBatchProcessing(): void {
 
   batchTimer = setTimeout(() => {
     processBatch().catch(error => {
-      logger.error('Error processing batch: %s', error instanceof Error ? error.message : String(error));
+      logger.error(
+        'Error processing batch: %s',
+        error instanceof Error ? error.message : String(error)
+      );
     });
   }, DEFAULT_BATCH_CONFIG.flushIntervalMs);
 }
@@ -235,7 +278,7 @@ function addToBatch(
       config,
       timestamp: Date.now(),
       resolve,
-      reject
+      reject,
     };
 
     batchQueue.push(batchedRequest);
@@ -245,7 +288,10 @@ function addToBatch(
       // Process immediately when batch is full
       setImmediate(() => {
         processBatch().catch(error => {
-          logger.error('Error processing full batch: %s', error instanceof Error ? error.message : String(error));
+          logger.error(
+            'Error processing full batch: %s',
+            error instanceof Error ? error.message : String(error)
+          );
         });
       });
     } else {
@@ -255,14 +301,17 @@ function addToBatch(
 
     // Check for old requests that should be flushed
     const now = Date.now();
-    const hasOldRequests = batchQueue.some(item =>
-      now - item.timestamp > DEFAULT_BATCH_CONFIG.maxWaitTimeMs
+    const hasOldRequests = batchQueue.some(
+      item => now - item.timestamp > DEFAULT_BATCH_CONFIG.maxWaitTimeMs
     );
 
     if (hasOldRequests) {
       setImmediate(() => {
         processBatch().catch(error => {
-          logger.error('Error processing aged batch: %s', error instanceof Error ? error.message : String(error));
+          logger.error(
+            'Error processing aged batch: %s',
+            error instanceof Error ? error.message : String(error)
+          );
         });
       });
     }
@@ -286,8 +335,13 @@ export interface ErrorContext {
  * @param urlType - Type of URL for error messages
  * @returns true if valid, throws error if invalid
  */
-export function validateSecureUrl(url: string, allowedUrls: string[], urlType: string): boolean {
-  if (!url || typeof url !== 'string') throw new Error(`Invalid ${urlType}: URL must be a non-empty string`);
+export function validateSecureUrl(
+  url: string,
+  allowedUrls: string[],
+  urlType: string
+): boolean {
+  if (!url || typeof url !== 'string')
+    throw new Error(`Invalid ${urlType}: URL must be a non-empty string`);
 
   let parsedUrl: URL;
   try {
@@ -297,21 +351,26 @@ export function validateSecureUrl(url: string, allowedUrls: string[], urlType: s
   }
 
   // Only allow HTTPS for security
-  if (parsedUrl.protocol !== 'https:') throw new Error(`Invalid ${urlType}: Only HTTPS URLs are allowed`);
+  if (parsedUrl.protocol !== 'https:')
+    throw new Error(`Invalid ${urlType}: Only HTTPS URLs are allowed`);
 
   // Check against allowlist
   const isAllowed = allowedUrls.some(allowedUrl => {
     try {
       const allowedParsed = new URL(allowedUrl);
-      return parsedUrl.hostname === allowedParsed.hostname &&
-             (url.startsWith(allowedUrl) || allowedUrl.startsWith(url));
+      return (
+        parsedUrl.hostname === allowedParsed.hostname &&
+        (url.startsWith(allowedUrl) || allowedUrl.startsWith(url))
+      );
     } catch {
       return false;
     }
   });
 
   if (!isAllowed) {
-    throw new Error(`Invalid ${urlType}: URL not in allowlist. Allowed domains: ${allowedUrls.map(u => new URL(u).hostname).join(', ')}`);
+    throw new Error(
+      `Invalid ${urlType}: URL not in allowlist. Allowed domains: ${allowedUrls.map(u => new URL(u).hostname).join(', ')}`
+    );
   }
 
   return true;
@@ -332,23 +391,45 @@ export function validateApiKey(apiKey: string, keyType: string): boolean {
   const trimmedKey = apiKey.trim();
 
   if (trimmedKey.length === 0) {
-    throw new Error(`Invalid ${keyType}: API key cannot be empty or only whitespace`);
+    throw new Error(
+      `Invalid ${keyType}: API key cannot be empty or only whitespace`
+    );
   }
 
   // Basic length validation (most API keys are at least 20 characters)
   if (trimmedKey.length < 20) {
-    throw new Error(`Invalid ${keyType}: API key appears too short (minimum 20 characters)`);
+    throw new Error(
+      `Invalid ${keyType}: API key appears too short (minimum 20 characters)`
+    );
   }
 
   // Check for common placeholder values
-  const placeholders = ['your-api-key', 'api-key-here', 'replace-me', 'test', 'demo', 'example'];
-  if (placeholders.some(placeholder => trimmedKey.toLowerCase().includes(placeholder))) {
-    throw new Error(`Invalid ${keyType}: API key appears to be a placeholder value`);
+  const placeholders = [
+    'your-api-key',
+    'api-key-here',
+    'replace-me',
+    'test',
+    'demo',
+    'example',
+  ];
+  if (
+    placeholders.some(placeholder =>
+      trimmedKey.toLowerCase().includes(placeholder)
+    )
+  ) {
+    throw new Error(
+      `Invalid ${keyType}: API key appears to be a placeholder value`
+    );
   }
 
   // OpenAI specific validation
-  if (keyType.toLowerCase().includes('openai') && !trimmedKey.startsWith('sk-')) {
-    throw new Error(`Invalid ${keyType}: OpenAI API keys must start with 'sk-'`);
+  if (
+    keyType.toLowerCase().includes('openai') &&
+    !trimmedKey.startsWith('sk-')
+  ) {
+    throw new Error(
+      `Invalid ${keyType}: OpenAI API keys must start with 'sk-'`
+    );
   }
 
   return true;
@@ -373,7 +454,9 @@ export function validateModelName(modelName: string): boolean {
   // Basic format validation - alphanumeric, hyphens, underscores, dots
   const validModelNameRegex = /^[a-zA-Z0-9._-]+$/;
   if (!validModelNameRegex.test(trimmedName)) {
-    throw new Error('Invalid model name: can only contain letters, numbers, dots, hyphens, and underscores');
+    throw new Error(
+      'Invalid model name: can only contain letters, numbers, dots, hyphens, and underscores'
+    );
   }
 
   // Length validation
@@ -427,7 +510,10 @@ export function validateNumericParameter(
  * @param allowUndefined - Whether undefined values are allowed
  * @returns true if valid, throws error if invalid
  */
-export function validateTimeout(timeout: unknown, allowUndefined: boolean = true): boolean {
+export function validateTimeout(
+  timeout: unknown,
+  allowUndefined: boolean = true
+): boolean {
   // Check for undefined/null first
   if (timeout === undefined || timeout === null) {
     if (allowUndefined) return true;
@@ -458,7 +544,9 @@ export function validateTimeout(timeout: unknown, allowUndefined: boolean = true
  * Map OpenAI finish reasons to Revenium stop reasons
  * Matches Python implementation
  */
-export function getStopReason(openaiFinishReason?: OpenAIFinishReason): ReveniumStopReason {
+export function getStopReason(
+  openaiFinishReason?: OpenAIFinishReason
+): ReveniumStopReason {
   const finishReasonMap: Record<string, ReveniumStopReason> = {
     stop: 'END',
     function_call: 'END_SEQUENCE',
@@ -471,17 +559,29 @@ export function getStopReason(openaiFinishReason?: OpenAIFinishReason): Revenium
   return finishReasonMap[openaiFinishReason || ''] || 'END';
 }
 
-/**
- * Build nested subscriber object from flat metadata
- * Supports both camelCase and snake_case field names
- */
-export function buildSubscriberObject(usageMetadata: UsageMetadata): SubscriberInfo | undefined {
-  const id = usageMetadata.subscriberId || usageMetadata.subscriber_id;
-  const email = usageMetadata.subscriberEmail || usageMetadata.subscriber_email;
-  const credentialName = usageMetadata.subscriberCredentialName || usageMetadata.subscriber_credential_name;
-  const credentialValue = usageMetadata.subscriberCredential || usageMetadata.subscriber_credential;
+function sanitizeStringField(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
 
-  // Return undefined if no subscriber data provided
+export function buildSubscriberObject(
+  usageMetadata: UsageMetadata
+): SubscriberInfo | undefined {
+  const id = sanitizeStringField(
+    usageMetadata.subscriberId || usageMetadata.subscriber_id
+  );
+  const email = sanitizeStringField(
+    usageMetadata.subscriberEmail || usageMetadata.subscriber_email
+  );
+  const credentialName = sanitizeStringField(
+    usageMetadata.subscriberCredentialName ||
+      usageMetadata.subscriber_credential_name
+  );
+  const credentialValue = sanitizeStringField(
+    usageMetadata.subscriberCredential || usageMetadata.subscriber_credential
+  );
+
   if (!id && !email && !credentialName && !credentialValue) {
     return undefined;
   }
@@ -491,11 +591,10 @@ export function buildSubscriberObject(usageMetadata: UsageMetadata): SubscriberI
   if (id) subscriber.id = id;
   if (email) subscriber.email = email;
 
-  // Only add credential if both name and value are present
   if (credentialName && credentialValue) {
     subscriber.credential = {
       name: credentialName,
-      value: credentialValue
+      value: credentialValue,
     };
   }
 
@@ -505,12 +604,19 @@ export function buildSubscriberObject(usageMetadata: UsageMetadata): SubscriberI
 /**
  * Validate metering prerequisites and get configuration
  */
-function validateMeteringPrerequisites(config?: ReveniumConfig): { apiKey: string; baseUrl: string } | null {
+function validateMeteringPrerequisites(
+  config?: ReveniumConfig
+): { apiKey: string; baseUrl: string } | null {
   const apiKey = config?.apiKey || process.env.REVENIUM_METERING_API_KEY;
-  const baseUrl = config?.baseUrl || process.env.REVENIUM_METERING_BASE_URL || 'https://api.revenium.ai';
+  const baseUrl =
+    config?.baseUrl ||
+    process.env.REVENIUM_METERING_BASE_URL ||
+    'https://api.revenium.ai';
 
   if (!apiKey) {
-    logger.warning('Skipping metering call: REVENIUM_METERING_API_KEY not provided');
+    logger.warning(
+      'Skipping metering call: REVENIUM_METERING_API_KEY not provided'
+    );
     return null;
   }
 
@@ -518,7 +624,9 @@ function validateMeteringPrerequisites(config?: ReveniumConfig): { apiKey: strin
 
   // Check circuit breaker
   if (!shouldAllowRequest(circuitBreakerConfig)) {
-    logger.warning('Revenium API circuit breaker is open, skipping usage logging');
+    logger.warning(
+      'Revenium API circuit breaker is open, skipping usage logging'
+    );
     return null;
   }
 
@@ -536,7 +644,11 @@ function validateMeteringPrerequisites(config?: ReveniumConfig): { apiKey: strin
  */
 function determineProvider(systemFingerprint?: string): 'OLLAMA' | 'OPENAI' {
   const provider = systemFingerprint === 'fp_ollama' ? 'OLLAMA' : 'OPENAI';
-  logger.debug('Determined provider: %s based on system_fingerprint: %s', provider, systemFingerprint);
+  logger.debug(
+    'Determined provider: %s based on system_fingerprint: %s',
+    provider,
+    systemFingerprint
+  );
   return provider;
 }
 
@@ -559,12 +671,39 @@ function buildCompletionRequest(
   isStreamed: boolean,
   timeToFirstToken: number
 ): CreateCompletionRequest {
-  // Build subscriber object from metadata
   const subscriber = buildSubscriberObject(usageMetadata);
   if (subscriber) {
     logger.debug('Built subscriber object: %O', subscriber);
   } else {
     logger.debug('No subscriber metadata provided');
+  }
+
+  const taskType = sanitizeStringField(
+    usageMetadata.taskType || usageMetadata.task_type
+  );
+  const agent = sanitizeStringField(usageMetadata.agent);
+  const organizationId = sanitizeStringField(
+    usageMetadata.organizationId || usageMetadata.organization_id
+  );
+  const productId = sanitizeStringField(
+    usageMetadata.productId || usageMetadata.product_id
+  );
+  const subscriptionId = sanitizeStringField(
+    usageMetadata.subscriptionId || usageMetadata.subscription_id
+  );
+  const traceId = sanitizeStringField(
+    usageMetadata.traceId || usageMetadata.trace_id
+  );
+
+  const safeRequestDuration = Math.round(requestDuration);
+  const safeTimeToFirstToken = Math.round(timeToFirstToken);
+
+  if (!Number.isFinite(safeRequestDuration) || safeRequestDuration < 0) {
+    logger.warning('Invalid requestDuration: %s, using 0', requestDuration);
+  }
+
+  if (!Number.isFinite(safeTimeToFirstToken) || safeTimeToFirstToken < 0) {
+    logger.warning('Invalid timeToFirstToken: %s, using 0', timeToFirstToken);
   }
 
   return {
@@ -578,24 +717,32 @@ function buildCompletionRequest(
     cacheCreationTokenCount: cachedTokens,
     cacheReadTokenCount: 0,
     totalTokenCount: totalTokens,
-    middlewareSource: 'n8n',  // Required field for source identification (camelCase per API spec)
+    middlewareSource: 'n8n',
     ...(subscriber ? { subscriber } : {}),
     model,
     transactionId: responseId,
     responseTime,
-    requestDuration: Math.round(requestDuration),
+    requestDuration:
+      Number.isFinite(safeRequestDuration) && safeRequestDuration >= 0
+        ? safeRequestDuration
+        : 0,
     provider,
     requestTime,
     completionStartTime: responseTime,
-    timeToFirstToken,
-    // Only include optional properties if they have values
-    ...(usageMetadata.taskType || usageMetadata.task_type ? { taskType: usageMetadata.taskType || usageMetadata.task_type } : {}),
-    ...(usageMetadata.agent ? { agent: usageMetadata.agent } : {}),
-    ...(usageMetadata.organizationId || usageMetadata.organization_id ? { organizationId: usageMetadata.organizationId || usageMetadata.organization_id } : {}),
-    ...(usageMetadata.productId || usageMetadata.product_id ? { productId: usageMetadata.productId || usageMetadata.product_id } : {}),
-    ...(usageMetadata.subscriptionId || usageMetadata.subscription_id ? { subscriptionId: usageMetadata.subscriptionId || usageMetadata.subscription_id } : {}),
-    ...(usageMetadata.traceId || usageMetadata.trace_id ? { traceId: usageMetadata.traceId || usageMetadata.trace_id } : {}),
-    ...(usageMetadata.responseQualityScore || usageMetadata.response_quality_score ? { responseQualityScore: usageMetadata.responseQualityScore || usageMetadata.response_quality_score } : {}),
+    timeToFirstToken:
+      Number.isFinite(safeTimeToFirstToken) && safeTimeToFirstToken >= 0
+        ? safeTimeToFirstToken
+        : 0,
+    ...(taskType ? { taskType } : {}),
+    ...(agent ? { agent } : {}),
+    ...(organizationId ? { organizationId } : {}),
+    ...(productId ? { productId } : {}),
+    ...(subscriptionId ? { subscriptionId } : {}),
+    ...(traceId ? { traceId } : {}),
+    ...(usageMetadata.responseQualityScore !== undefined &&
+    Number.isFinite(usageMetadata.responseQualityScore)
+      ? { responseQualityScore: usageMetadata.responseQualityScore }
+      : {}),
   };
 }
 
@@ -612,10 +759,17 @@ async function executeMeteringRequest(
   // In test mode, make direct API call with retry logic instead of batching
   if (isTestMode) {
     try {
-      await createCompletionWithRetry(completionRequest, { apiKey, baseUrl }, circuitBreakerConfig);
-      logger.debug('Metering call completed directly with retry logic (test mode)');
+      await createCompletionWithRetry(
+        completionRequest,
+        { apiKey, baseUrl },
+        circuitBreakerConfig
+      );
+      logger.debug(
+        'Metering call completed directly with retry logic (test mode)'
+      );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.warning('Error making direct metering call: %s', errorMessage);
       logger.debug('Full error details: %O', error);
     }
@@ -625,8 +779,12 @@ async function executeMeteringRequest(
       await addToBatch(completionRequest, { apiKey, baseUrl });
       logger.debug('Metering call queued for batch processing');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.warning('Error queuing metering call for batch processing: %s', errorMessage);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.warning(
+        'Error queuing metering call for batch processing: %s',
+        errorMessage
+      );
       logger.debug('Full error details: %O', error);
     }
   }
@@ -683,10 +841,17 @@ export async function logTokenUsage(
   );
 
   // Log the arguments at debug level (matching Python)
-  logger.debug('Calling /meter/v2/ai/completions with args: %O', completionRequest);
+  logger.debug(
+    'Calling /meter/v2/ai/completions with args: %O',
+    completionRequest
+  );
 
   // Execute the metering request
-  await executeMeteringRequest(completionRequest, meteringConfig.apiKey, meteringConfig.baseUrl);
+  await executeMeteringRequest(
+    completionRequest,
+    meteringConfig.apiKey,
+    meteringConfig.baseUrl
+  );
 }
 
 /**
@@ -697,16 +862,16 @@ function getSecureHeaders(apiKey: string): Record<string, string> {
 
   return {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    Accept: 'application/json',
     'User-Agent': 'n8n-revenium-middleware/1.0.0',
-    'x-api-key': apiKey,  // Revenium expects lowercase
+    'x-api-key': apiKey, // Revenium expects lowercase
     'X-Correlation-ID': correlationId,
     'X-Request-ID': correlationId,
     'Cache-Control': 'no-cache, no-store, must-revalidate',
-    'Pragma': 'no-cache',
+    Pragma: 'no-cache',
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
-    'X-XSS-Protection': '1; mode=block'
+    'X-XSS-Protection': '1; mode=block',
   };
 }
 
@@ -723,7 +888,7 @@ function validateResponseHeaders(response: Response): void {
   const securityHeaders = [
     'x-content-type-options',
     'x-frame-options',
-    'strict-transport-security'
+    'strict-transport-security',
   ];
 
   securityHeaders.forEach(header => {
@@ -738,7 +903,9 @@ function validateResponseHeaders(response: Response): void {
  * @param obj - Object to check
  * @returns true if object has a schema property of the correct type
  */
-export function hasValidSchema(obj: unknown): obj is { schema: Record<string, unknown> } {
+export function hasValidSchema(
+  obj: unknown
+): obj is { schema: Record<string, unknown> } {
   return (
     typeof obj === 'object' &&
     obj !== null &&
@@ -753,7 +920,9 @@ export function hasValidSchema(obj: unknown): obj is { schema: Record<string, un
  * @param obj - Object to check
  * @returns true if object has a description property of the correct type
  */
-export function hasValidDescription(obj: unknown): obj is { description: string } {
+export function hasValidDescription(
+  obj: unknown
+): obj is { description: string } {
   return (
     typeof obj === 'object' &&
     obj !== null &&
@@ -778,7 +947,11 @@ export function hasToolSchemaStructure(obj: unknown): obj is {
   const typedObj = obj as any;
 
   // Check properties if it exists
-  if ('properties' in typedObj  && typeof typedObj.properties !== 'object' || typedObj.properties === null) return false;
+  if (
+    ('properties' in typedObj && typeof typedObj.properties !== 'object') ||
+    typedObj.properties === null
+  )
+    return false;
 
   // Check required if it exists
   if ('required' in typedObj && !Array.isArray(typedObj.required)) return false;
@@ -819,12 +992,10 @@ export function hasValidMessage(obj: unknown): obj is { message: string } {
  * @param obj - Object to check
  * @returns true if object has a response property
  */
-export function isN8nMemoryConnection(obj: unknown): obj is { response: unknown } {
-  return (
-    typeof obj === 'object' &&
-    obj !== null &&
-    'response' in obj
-  );
+export function isN8nMemoryConnection(
+  obj: unknown
+): obj is { response: unknown } {
+  return typeof obj === 'object' && obj !== null && 'response' in obj;
 }
 
 /**
@@ -832,12 +1003,22 @@ export function isN8nMemoryConnection(obj: unknown): obj is { response: unknown 
  * @param obj - Object to check
  * @returns true if object has loadMemoryVariables function
  */
-export function hasLoadMemoryVariables(obj: unknown): obj is { loadMemoryVariables: (input: Record<string, unknown>) => Promise<Record<string, unknown>> } {
+export function hasLoadMemoryVariables(obj: unknown): obj is {
+  loadMemoryVariables: (
+    input: Record<string, unknown>
+  ) => Promise<Record<string, unknown>>;
+} {
   return (
     typeof obj === 'object' &&
     obj !== null &&
     'loadMemoryVariables' in obj &&
-    typeof (obj as { loadMemoryVariables: (input: Record<string, unknown>) => Promise<Record<string, unknown>> }).loadMemoryVariables === 'function'
+    typeof (
+      obj as {
+        loadMemoryVariables: (
+          input: Record<string, unknown>
+        ) => Promise<Record<string, unknown>>;
+      }
+    ).loadMemoryVariables === 'function'
   );
 }
 
@@ -846,12 +1027,15 @@ export function hasLoadMemoryVariables(obj: unknown): obj is { loadMemoryVariabl
  * @param obj - Object to check
  * @returns true if object has getMessages function
  */
-export function hasGetMessages(obj: unknown): obj is { getMessages: () => Promise<unknown[]> } {
+export function hasGetMessages(
+  obj: unknown
+): obj is { getMessages: () => Promise<unknown[]> } {
   return (
     typeof obj === 'object' &&
     obj !== null &&
     'getMessages' in obj &&
-    typeof (obj as { getMessages: () => Promise<unknown[]> }).getMessages === 'function'
+    typeof (obj as { getMessages: () => Promise<unknown[]> }).getMessages ===
+      'function'
   );
 }
 
@@ -860,12 +1044,24 @@ export function hasGetMessages(obj: unknown): obj is { getMessages: () => Promis
  * @param obj - Object to check
  * @returns true if object has saveContext function
  */
-export function hasSaveContext(obj: unknown): obj is { saveContext: (input: Record<string, unknown>, output: Record<string, unknown>) => Promise<void> } {
+export function hasSaveContext(obj: unknown): obj is {
+  saveContext: (
+    input: Record<string, unknown>,
+    output: Record<string, unknown>
+  ) => Promise<void>;
+} {
   return (
     typeof obj === 'object' &&
     obj !== null &&
     'saveContext' in obj &&
-    typeof (obj as { saveContext: (input: Record<string, unknown>, output: Record<string, unknown>) => Promise<void> }).saveContext === 'function'
+    typeof (
+      obj as {
+        saveContext: (
+          input: Record<string, unknown>,
+          output: Record<string, unknown>
+        ) => Promise<void>;
+      }
+    ).saveContext === 'function'
   );
 }
 
@@ -874,12 +1070,26 @@ export function hasSaveContext(obj: unknown): obj is { saveContext: (input: Reco
  * @param obj - Object to check
  * @returns true if object has usage_metadata
  */
-export function hasUsageMetadata(obj: unknown): obj is { usage_metadata: { input_tokens?: number; output_tokens?: number; total_tokens?: number } } {
+export function hasUsageMetadata(obj: unknown): obj is {
+  usage_metadata: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+  };
+} {
   return (
     typeof obj === 'object' &&
     obj !== null &&
     'usage_metadata' in obj &&
-    typeof (obj as { usage_metadata: { input_tokens?: number; output_tokens?: number; total_tokens?: number } }).usage_metadata === 'object'
+    typeof (
+      obj as {
+        usage_metadata: {
+          input_tokens?: number;
+          output_tokens?: number;
+          total_tokens?: number;
+        };
+      }
+    ).usage_metadata === 'object'
   );
 }
 
@@ -888,7 +1098,9 @@ export function hasUsageMetadata(obj: unknown): obj is { usage_metadata: { input
  * @param obj - Object to check
  * @returns true if object has role and content properties
  */
-export function isHistoryMessage(obj: unknown): obj is { role: string; content: string } {
+export function isHistoryMessage(
+  obj: unknown
+): obj is { role: string; content: string } {
   return (
     typeof obj === 'object' &&
     obj !== null &&
@@ -918,7 +1130,9 @@ export function hasCreatedProperty(obj: unknown): obj is { created: number } {
  * @param obj - Object to check
  * @returns true if object has LangChain message structure
  */
-export function isLangChainMessage(obj: unknown): obj is { _getType: () => string; content: string } {
+export function isLangChainMessage(
+  obj: unknown
+): obj is { _getType: () => string; content: string } {
   return (
     typeof obj === 'object' &&
     obj !== null &&
@@ -961,10 +1175,7 @@ export function hasTokenUsage(obj: unknown): obj is {
     audio?: number;
   };
 } {
-  return (
-    typeof obj === 'object' &&
-    obj !== null
-  );
+  return typeof obj === 'object' && obj !== null;
 }
 
 /**
@@ -977,11 +1188,10 @@ export async function createCompletion(
   const url = `${config.baseUrl}/v2/ai/completions`;
   logger.debug('Making POST request to: %s', url);
 
-  // Validate request payload size
   const requestBody = JSON.stringify(request);
   const requestSizeKB = Buffer.byteLength(requestBody, 'utf8') / 1024;
 
-  if (requestSizeKB > 100) { // 100KB limit
+  if (requestSizeKB > 100) {
     logger.warning('Large request payload: %d KB', requestSizeKB);
   }
 
@@ -997,14 +1207,16 @@ export async function createCompletion(
   validateResponseHeaders(response);
 
   // Log response status for debugging
-  logger.debug('Revenium API response status: %d %s', response.status, response.statusText);
+  logger.debug(
+    'Revenium API response status: %d %s',
+    response.status,
+    response.statusText
+  );
 
   if (!response.ok) {
     const errorText = await response.text();
-    // Sanitize error message to prevent information leakage
-    const sanitizedError = errorText.length > 500 ?
-      `${errorText.substring(0, 500)}...` :
-      errorText;
+    const sanitizedError =
+      errorText.length > 500 ? `${errorText.substring(0, 500)}...` : errorText;
 
     logger.error('Revenium API error %d: %s', response.status, sanitizedError);
     throw new Error(`Revenium API error ${response.status}: ${sanitizedError}`);
@@ -1012,11 +1224,12 @@ export async function createCompletion(
 
   // Validate response size
   const contentLength = response.headers.get('content-length');
-  if (contentLength && parseInt(contentLength) > 1024 * 1024) { // 1MB limit
+  if (contentLength && parseInt(contentLength) > 1024 * 1024) {
+    // 1MB limit
     logger.warning('Large response payload: %s bytes', contentLength);
   }
 
-  const result = await response.json() as CreateCompletionResponse;
+  const result = (await response.json()) as CreateCompletionResponse;
 
   // Basic response validation
   if (!result || typeof result !== 'object') {
@@ -1110,7 +1323,9 @@ export function calculateDuration(startTime: Date, endTime: Date): number {
  * @returns Validated credentials object
  * @throws Error if validation fails
  */
-export function validateCredentials(credentials: unknown): ReveniumOpenAICredentials {
+export function validateCredentials(
+  credentials: unknown
+): ReveniumOpenAICredentials {
   if (!credentials || typeof credentials !== 'object') {
     throw new Error('Invalid credentials: must be an object');
   }
@@ -1119,28 +1334,44 @@ export function validateCredentials(credentials: unknown): ReveniumOpenAICredent
 
   // Validate OpenAI API key with comprehensive validation
   if (!creds.openaiApiKey || typeof creds.openaiApiKey !== 'string') {
-    throw new Error('Invalid credentials: openaiApiKey is required and must be a string');
+    throw new Error(
+      'Invalid credentials: openaiApiKey is required and must be a string'
+    );
   }
   validateApiKey(creds.openaiApiKey, 'OpenAI API key');
 
   // Validate Revenium API key with comprehensive validation
   if (!creds.reveniumApiKey || typeof creds.reveniumApiKey !== 'string') {
-    throw new Error('Invalid credentials: reveniumApiKey is required and must be a string');
+    throw new Error(
+      'Invalid credentials: reveniumApiKey is required and must be a string'
+    );
   }
   validateApiKey(creds.reveniumApiKey, 'Revenium API key');
 
   // Validate Revenium base URL (required)
   if (!creds.reveniumBaseUrl || typeof creds.reveniumBaseUrl !== 'string') {
-    throw new Error('Invalid credentials: reveniumBaseUrl is required and must be a string');
+    throw new Error(
+      'Invalid credentials: reveniumBaseUrl is required and must be a string'
+    );
   }
-  validateSecureUrl(creds.reveniumBaseUrl, ALLOWED_REVENIUM_BASE_URLS, 'Revenium base URL');
+  validateSecureUrl(
+    creds.reveniumBaseUrl,
+    ALLOWED_REVENIUM_BASE_URLS,
+    'Revenium base URL'
+  );
 
   // Validate OpenAI base URL (optional)
   if (creds.openaiBaseUrl) {
     if (typeof creds.openaiBaseUrl !== 'string') {
-      throw new Error('Invalid credentials: openaiBaseUrl must be a string if provided');
+      throw new Error(
+        'Invalid credentials: openaiBaseUrl must be a string if provided'
+      );
     }
-    validateSecureUrl(creds.openaiBaseUrl, ALLOWED_OPENAI_BASE_URLS, 'OpenAI base URL');
+    validateSecureUrl(
+      creds.openaiBaseUrl,
+      ALLOWED_OPENAI_BASE_URLS,
+      'OpenAI base URL'
+    );
   }
 
   return creds as unknown as ReveniumOpenAICredentials;
@@ -1166,7 +1397,8 @@ export function createReveniumError(
   if (statusCode) error.statusCode = statusCode;
 
   if (cause) error.cause = cause;
-  if (cause instanceof Error) error.stack = `${error.stack}\nCaused by: ${cause.stack}`;
+  if (cause instanceof Error)
+    error.stack = `${error.stack}\nCaused by: ${cause.stack}`;
 
   return error;
 }
@@ -1198,7 +1430,7 @@ export function getErrorDetails(error: unknown): {
   stack?: string;
 } {
   const details = {
-    message: getErrorMessage(error)
+    message: getErrorMessage(error),
   };
 
   if (error instanceof Error) {
@@ -1207,7 +1439,9 @@ export function getErrorDetails(error: unknown): {
       ...details,
       name: error.name,
       ...(reveniumError.code !== undefined ? { code: reveniumError.code } : {}),
-      ...(reveniumError.statusCode !== undefined ? { statusCode: reveniumError.statusCode } : {}),
+      ...(reveniumError.statusCode !== undefined
+        ? { statusCode: reveniumError.statusCode }
+        : {}),
       ...(error.stack !== undefined ? { stack: error.stack } : {}),
     };
   }
@@ -1223,13 +1457,14 @@ export function getErrorDetails(error: unknown): {
 export function sanitizeForLogging(data: unknown): unknown {
   if (typeof data === 'string') {
     // Mask API keys
-    return data.replace(/sk-[a-zA-Z0-9]{48}/g, 'sk-***MASKED***')
-               .replace(/[a-zA-Z0-9]{32,}/g, (match) => {
-                 if (match.length > 20) {
-                   return `${match.substring(0, 4)}***MASKED***${match.substring(match.length - 4)}`;
-                 }
-                 return match;
-               });
+    return data
+      .replace(/sk-[a-zA-Z0-9]{48}/g, 'sk-***MASKED***')
+      .replace(/[a-zA-Z0-9]{32,}/g, match => {
+        if (match.length > 20) {
+          return `${match.substring(0, 4)}***MASKED***${match.substring(match.length - 4)}`;
+        }
+        return match;
+      });
   }
 
   if (data && typeof data === 'object') {
@@ -1239,9 +1474,13 @@ export function sanitizeForLogging(data: unknown): unknown {
       const lowerKey = key.toLowerCase();
 
       // Mask sensitive fields
-      if (lowerKey.includes('key') || lowerKey.includes('token') ||
-          lowerKey.includes('secret') || lowerKey.includes('password') ||
-          lowerKey.includes('credential')) {
+      if (
+        lowerKey.includes('key') ||
+        lowerKey.includes('token') ||
+        lowerKey.includes('secret') ||
+        lowerKey.includes('password') ||
+        lowerKey.includes('credential')
+      ) {
         sanitized[key] = '***MASKED***';
       } else if (typeof value === 'string' && value.length > 20) {
         // Mask long strings that might be sensitive
@@ -1262,7 +1501,9 @@ export function sanitizeForLogging(data: unknown): unknown {
  * @param config - Rate limit configuration
  * @returns true if request is allowed, false if rate limited
  */
-export function checkRateLimit(config: RateLimitConfig = DEFAULT_RATE_LIMIT_CONFIG): boolean {
+export function checkRateLimit(
+  config: RateLimitConfig = DEFAULT_RATE_LIMIT_CONFIG
+): boolean {
   const now = Date.now();
 
   // Reset minute window if needed
@@ -1279,12 +1520,18 @@ export function checkRateLimit(config: RateLimitConfig = DEFAULT_RATE_LIMIT_CONF
 
   // Check limits
   if (rateLimitState.requestsThisMinute >= config.maxRequestsPerMinute) {
-    logger.warning('Rate limit exceeded: %d requests per minute', rateLimitState.requestsThisMinute);
+    logger.warning(
+      'Rate limit exceeded: %d requests per minute',
+      rateLimitState.requestsThisMinute
+    );
     return false;
   }
 
   if (rateLimitState.requestsThisHour >= config.maxRequestsPerHour) {
-    logger.warning('Rate limit exceeded: %d requests per hour', rateLimitState.requestsThisHour);
+    logger.warning(
+      'Rate limit exceeded: %d requests per hour',
+      rateLimitState.requestsThisHour
+    );
     return false;
   }
 
