@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.6] - 2026-01-21
+## [0.2.0] - 2026-01-21
+
+### Added
+
+- Prompt capture functionality (opt-in via REVENIUM_CAPTURE_PROMPTS)
+- System prompt, input messages, and output response tracking
+- Automatic credential sanitization with 13 comprehensive patterns
+- Summary printer for human-readable and JSON output
+- Support for teamId in credentials
+- Support for printSummary configuration
 
 ### Changed
 
@@ -17,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - More specific pattern matching for OpenAI project keys (sk-proj-\*)
 - More specific pattern matching for Anthropic keys (sk-ant-\*)
 - More specific pattern matching for Perplexity keys (pplx-\*)
+- Updated UsageMetadata interface with capturePrompts and maxPromptSize
+- Updated CreateCompletionRequest with prompt fields
+- Updated ReveniumOpenAICredentials with printSummary and teamId
 
 ### Security
 

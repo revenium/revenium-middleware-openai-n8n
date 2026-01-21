@@ -12,17 +12,21 @@ import type {
   OpenAIUsage,
   SubscriberInfo,
   ReveniumStopReason,
-  OpenAIFinishReason
+  OpenAIFinishReason,
 } from '../../types/index.js';
-import { 
-  hasValidId, 
-  hasTokenUsage, 
-  createReveniumError, 
+import {
+  hasValidId,
+  hasTokenUsage,
+  createReveniumError,
   getErrorDetails,
-  buildSubscriberObject 
+  buildSubscriberObject,
 } from '../../utils/index.js';
 import { logger } from '../../utils/logger.js';
 import { buildReveniumUrl } from '../../utils/url-builder.js';
+import {
+  setConfig as setSummaryPrinterConfig,
+  printUsageSummary,
+} from '../../utils/summary-printer.js';
 
 /**
  * Revenium service configuration
@@ -31,6 +35,8 @@ export interface ReveniumServiceConfig {
   apiKey: string;
   baseUrl: string;
   usageMetadata?: Record<string, unknown>;
+  printSummary?: boolean | 'human' | 'json';
+  teamId?: string;
 }
 
 /**
@@ -51,6 +57,13 @@ export class ReveniumService {
 
   constructor(config: ReveniumServiceConfig) {
     this.config = config;
+
+    setSummaryPrinterConfig({
+      reveniumApiKey: config.apiKey,
+      reveniumBaseUrl: config.baseUrl,
+      teamId: config.teamId,
+      printSummary: config.printSummary,
+    });
   }
 
   /**
@@ -70,8 +83,11 @@ export class ReveniumService {
       const message = generation?.message;
 
       // Extract usage data from multiple sources
-      const usage = responseMetadata.usage || responseMetadata.tokenUsage || usageMetadata;
-      const requestId = hasValidId(message) ? message.id : `generated-${Date.now()}`;
+      const usage =
+        responseMetadata.usage || responseMetadata.tokenUsage || usageMetadata;
+      const requestId = hasValidId(message)
+        ? message.id
+        : `generated-${Date.now()}`;
       const finishReason = responseMetadata.finish_reason || 'stop';
 
       // Debug logging for usage data extraction
@@ -81,13 +97,19 @@ export class ReveniumService {
         hasUsageMetadata: !!usageMetadata,
         finalUsage: !!usage,
         usageStructure: usage ? Object.keys(usage) : null,
-        responseMetadataKeys: Object.keys(responseMetadata)
+        responseMetadataKeys: Object.keys(responseMetadata),
       });
 
       // Check if we have any usage data at all
       if (!usage) {
-        logger.warning('No usage data found in any location - skipping Revenium tracking');
-        logger.debug('Available data for debugging: responseMetadata=%O, usageMetadata=%O', responseMetadata, usageMetadata);
+        logger.warning(
+          'No usage data found in any location - skipping Revenium tracking'
+        );
+        logger.debug(
+          'Available data for debugging: responseMetadata=%O, usageMetadata=%O',
+          responseMetadata,
+          usageMetadata
+        );
         throw new Error('No usage data available for tracking');
       }
 
@@ -102,12 +124,31 @@ export class ReveniumService {
       );
 
       // Send to Revenium API
-      return await this.sendTrackingData(payload);
+      const result = await this.sendTrackingData(payload);
 
+      try {
+        printUsageSummary(payload);
+      } catch (summaryError) {
+        logger.debug(
+          'Failed to print usage summary (non-blocking): %s',
+          summaryError instanceof Error
+            ? summaryError.message
+            : String(summaryError)
+        );
+      }
+
+      return result;
     } catch (error) {
       const errorDetails = getErrorDetails(error);
-      logger.error('Failed to track usage with Revenium: %s', errorDetails.message);
-      throw createReveniumError('Usage tracking failed', error, 'TRACKING_FAILED');
+      logger.error(
+        'Failed to track usage with Revenium: %s',
+        errorDetails.message
+      );
+      throw createReveniumError(
+        'Usage tracking failed',
+        error,
+        'TRACKING_FAILED'
+      );
     }
   }
 
@@ -132,16 +173,31 @@ export class ReveniumService {
     const subscriber = buildSubscriberObject(this.config.usageMetadata);
 
     // Safely extract token counts with fallbacks using type guard
-    const inputTokenCount = hasTokenUsage(usage) ?
-      (usage.prompt_tokens || usage.promptTokens || usage.input_tokens || 0) : 0;
-    const outputTokenCount = hasTokenUsage(usage) ?
-      (usage.completion_tokens || usage.completionTokens || usage.output_tokens || 0) : 0;
-    const totalTokenCount = hasTokenUsage(usage) ?
-      (usage.total_tokens || usage.totalTokens || (inputTokenCount + outputTokenCount) || 0) : 0;
-    const reasoningTokenCount = hasTokenUsage(usage) ?
-      (usage.completion_tokens_details?.reasoning_tokens || usage.output_token_details?.reasoning || 0) : 0;
-    const cacheReadTokenCount = hasTokenUsage(usage) ?
-      (usage.prompt_tokens_details?.cached_tokens || usage.input_token_details?.cache_read || 0) : 0;
+    const inputTokenCount = hasTokenUsage(usage)
+      ? usage.prompt_tokens || usage.promptTokens || usage.input_tokens || 0
+      : 0;
+    const outputTokenCount = hasTokenUsage(usage)
+      ? usage.completion_tokens ||
+        usage.completionTokens ||
+        usage.output_tokens ||
+        0
+      : 0;
+    const totalTokenCount = hasTokenUsage(usage)
+      ? usage.total_tokens ||
+        usage.totalTokens ||
+        inputTokenCount + outputTokenCount ||
+        0
+      : 0;
+    const reasoningTokenCount = hasTokenUsage(usage)
+      ? usage.completion_tokens_details?.reasoning_tokens ||
+        usage.output_token_details?.reasoning ||
+        0
+      : 0;
+    const cacheReadTokenCount = hasTokenUsage(usage)
+      ? usage.prompt_tokens_details?.cached_tokens ||
+        usage.input_token_details?.cache_read ||
+        0
+      : 0;
 
     return {
       stopReason,
@@ -166,50 +222,85 @@ export class ReveniumService {
       systemFingerprint: options.systemFingerprint,
       modelVersion: options.modelVersion || modelName,
       // Additional OpenAI-specific token details
-      audioInputTokens: hasTokenUsage(usage) ?
-        (usage.prompt_tokens_details?.audio_tokens || usage.input_token_details?.audio || 0) : 0,
-      audioOutputTokens: hasTokenUsage(usage) ?
-        (usage.completion_tokens_details?.audio_tokens || usage.output_token_details?.audio || 0) : 0,
-      acceptedPredictionTokens: hasTokenUsage(usage) ?
-        (usage.completion_tokens_details?.accepted_prediction_tokens || 0) : 0,
-      rejectedPredictionTokens: hasTokenUsage(usage) ?
-        (usage.completion_tokens_details?.rejected_prediction_tokens || 0) : 0,
+      audioInputTokens: hasTokenUsage(usage)
+        ? usage.prompt_tokens_details?.audio_tokens ||
+          usage.input_token_details?.audio ||
+          0
+        : 0,
+      audioOutputTokens: hasTokenUsage(usage)
+        ? usage.completion_tokens_details?.audio_tokens ||
+          usage.output_token_details?.audio ||
+          0
+        : 0,
+      acceptedPredictionTokens: hasTokenUsage(usage)
+        ? usage.completion_tokens_details?.accepted_prediction_tokens || 0
+        : 0,
+      rejectedPredictionTokens: hasTokenUsage(usage)
+        ? usage.completion_tokens_details?.rejected_prediction_tokens || 0
+        : 0,
       // NEW nested subscriber structure and middleware source
       subscriber,
-      middlewareSource: 'n8n',  // Required field for source identification (camelCase per API spec)
+      middlewareSource: 'n8n', // Required field for source identification (camelCase per API spec)
       // User-defined metadata (only include if values are provided)
-      ...(this.config.usageMetadata?.traceId && { traceId: this.config.usageMetadata.traceId }),
-      ...(this.config.usageMetadata?.taskType && { taskType: this.config.usageMetadata.taskType }),
-      ...(this.config.usageMetadata?.agent && { agent: this.config.usageMetadata.agent }),
-      ...(this.config.usageMetadata?.organizationId && { organizationId: this.config.usageMetadata.organizationId }),
-      ...(this.config.usageMetadata?.productId && { productId: this.config.usageMetadata.productId }),
-      ...(this.config.usageMetadata?.subscriptionId && { subscriptionId: this.config.usageMetadata.subscriptionId }),
-      ...(this.config.usageMetadata?.responseQualityScore && { responseQualityScore: this.config.usageMetadata.responseQualityScore }),
+      ...(this.config.usageMetadata?.traceId && {
+        traceId: this.config.usageMetadata.traceId,
+      }),
+      ...(this.config.usageMetadata?.taskType && {
+        taskType: this.config.usageMetadata.taskType,
+      }),
+      ...(this.config.usageMetadata?.agent && {
+        agent: this.config.usageMetadata.agent,
+      }),
+      ...(this.config.usageMetadata?.organizationId && {
+        organizationId: this.config.usageMetadata.organizationId,
+      }),
+      ...(this.config.usageMetadata?.productId && {
+        productId: this.config.usageMetadata.productId,
+      }),
+      ...(this.config.usageMetadata?.subscriptionId && {
+        subscriptionId: this.config.usageMetadata.subscriptionId,
+      }),
+      ...(this.config.usageMetadata?.responseQualityScore && {
+        responseQualityScore: this.config.usageMetadata.responseQualityScore,
+      }),
     };
   }
 
   /**
    * Send tracking data to Revenium API
    */
-  private async sendTrackingData(payload: CreateCompletionRequest): Promise<CreateCompletionResponse> {
+  private async sendTrackingData(
+    payload: CreateCompletionRequest
+  ): Promise<CreateCompletionResponse> {
     const url = buildReveniumUrl(this.config.baseUrl, '/ai/completions');
 
     // Log tracking info without sensitive data
-    logger.debug('Sending Revenium tracking payload: requestId=%s, model=%s, tokens=%d, duration=%d, stopReason=%s, isStreamed=%s',
-      payload.transactionId, payload.model, payload.totalTokenCount, payload.requestDuration, payload.stopReason, payload.isStreamed);
+    logger.debug(
+      'Sending Revenium tracking payload: requestId=%s, model=%s, tokens=%d, duration=%d, stopReason=%s, isStreamed=%s',
+      payload.transactionId,
+      payload.model,
+      payload.totalTokenCount,
+      payload.requestDuration,
+      payload.stopReason,
+      payload.isStreamed
+    );
 
     // Debug credentials and URL construction
-    logger.debug('Revenium API call details: url=%s, apiKeyPrefix=%s, baseUrl=%s',
+    logger.debug(
+      'Revenium API call details: url=%s, apiKeyPrefix=%s, baseUrl=%s',
       url,
-      this.config.apiKey ? this.config.apiKey.substring(0, 8) + '...' : 'MISSING',
-      this.config.baseUrl);
+      this.config.apiKey
+        ? this.config.apiKey.substring(0, 8) + '...'
+        : 'MISSING',
+      this.config.baseUrl
+    );
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'x-api-key': this.config.apiKey,  // Revenium expects lowercase
+        Accept: 'application/json',
+        'x-api-key': this.config.apiKey, // Revenium expects lowercase
         'User-Agent': 'n8n-revenium-middleware/1.0.0',
       },
       body: JSON.stringify(payload),
@@ -225,16 +316,18 @@ export class ReveniumService {
       );
     }
 
-    const result = await response.json() as CreateCompletionResponse;
+    const result = (await response.json()) as CreateCompletionResponse;
     logger.debug('Revenium tracking successful: responseId=%s', result.id);
-    
+
     return result;
   }
 
   /**
    * Map OpenAI finish reason to Revenium stop reason
    */
-  private mapFinishReasonToStopReason(finishReason: OpenAIFinishReason): ReveniumStopReason {
+  private mapFinishReasonToStopReason(
+    finishReason: OpenAIFinishReason
+  ): ReveniumStopReason {
     switch (finishReason) {
       case 'stop':
         return 'END';
@@ -255,11 +348,15 @@ export class ReveniumService {
   /**
    * Create service instance from credentials
    */
-  static fromCredentials(credentials: ReveniumOpenAICredentials): ReveniumService {
+  static fromCredentials(
+    credentials: ReveniumOpenAICredentials
+  ): ReveniumService {
     return new ReveniumService({
       apiKey: credentials.reveniumApiKey,
       baseUrl: credentials.reveniumBaseUrl,
       usageMetadata: credentials.usageMetadata,
+      printSummary: credentials.printSummary,
+      teamId: credentials.teamId,
     });
   }
 }

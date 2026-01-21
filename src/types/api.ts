@@ -17,7 +17,7 @@ export interface UsageMetadata {
   product_id?: string;
   agent?: string;
   response_quality_score?: number; // 0..1
-  
+
   // New camelCase support (preferred for UI consistency)
   traceId?: string;
   taskId?: string;
@@ -30,6 +30,10 @@ export interface UsageMetadata {
   subscriptionId?: string;
   productId?: string;
   responseQualityScore?: number; // 0..10
+
+  // Prompt capture configuration
+  capturePrompts?: boolean;
+  maxPromptSize?: number;
 }
 
 // New subscriber-related interfaces for nested structure
@@ -45,11 +49,16 @@ export interface SubscriberInfo {
 }
 
 // Helper type for building subscriber object from flat metadata
-export type SubscriberMetadata = Pick<UsageMetadata,
-  'subscriberEmail' | 'subscriber_email' |
-  'subscriberId' | 'subscriber_id' |
-  'subscriberCredentialName' | 'subscriber_credential_name' |
-  'subscriberCredential' | 'subscriber_credential'
+export type SubscriberMetadata = Pick<
+  UsageMetadata,
+  | 'subscriberEmail'
+  | 'subscriber_email'
+  | 'subscriberId'
+  | 'subscriber_id'
+  | 'subscriberCredentialName'
+  | 'subscriber_credential_name'
+  | 'subscriberCredential'
+  | 'subscriber_credential'
 >;
 
 // Revenium API request payload for /meter/v2/ai/completions
@@ -81,6 +90,11 @@ export interface CreateCompletionRequest {
   timeToFirstToken: number; // milliseconds
   traceId?: string;
   responseQualityScore?: number;
+  attributes?: Record<string, unknown>;
+  systemPrompt?: string;
+  inputMessages?: string;
+  outputResponse?: string;
+  promptsTruncated?: boolean;
 }
 
 // Revenium API response
@@ -102,18 +116,20 @@ export interface ReveniumOpenAICredentials {
   reveniumApiKey: string;
   reveniumBaseUrl: string;
   usageMetadata?: UsageMetadata;
+  printSummary?: boolean | 'human' | 'json';
+  teamId?: string;
 }
 
 // Revenium stop reasons (matches API schema)
 export type ReveniumStopReason =
-  | 'END'              // Completion ended normally
-  | 'END_SEQUENCE'     // Ended due to reaching end sequence
-  | 'TIMEOUT'          // Ended due to timeout
-  | 'TOKEN_LIMIT'      // Ended due to reaching token limit
-  | 'COST_LIMIT'       // Ended due to reaching cost limit
+  | 'END' // Completion ended normally
+  | 'END_SEQUENCE' // Ended due to reaching end sequence
+  | 'TIMEOUT' // Ended due to timeout
+  | 'TOKEN_LIMIT' // Ended due to reaching token limit
+  | 'COST_LIMIT' // Ended due to reaching cost limit
   | 'COMPLETION_LIMIT' // Ended due to reaching completion limit
-  | 'ERROR'            // Ended due to error
-  | 'CANCELLED';       // Completion was cancelled
+  | 'ERROR' // Ended due to error
+  | 'CANCELLED'; // Completion was cancelled
 
 // Error types for better error handling
 export interface ReveniumError extends Error {
