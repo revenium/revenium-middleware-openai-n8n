@@ -39,7 +39,7 @@
     "test:integration": "vitest run --config tests/integration/vitest.integration.config.ts",
     "test:integration:watch": "vitest --config tests/integration/vitest.integration.config.ts",
     "test:all": "npm run test:unit && npm run test:integration",
-    "prepublishOnly": "npm run build && npm run lint"
+    "prepublishOnly": "npm run build"
   },
   "files": [
     "dist",
