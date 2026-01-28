@@ -251,11 +251,21 @@ export class ReveniumService {
       ...(this.config.usageMetadata?.agent && {
         agent: this.config.usageMetadata.agent,
       }),
-      ...(this.config.usageMetadata?.organizationId && {
-        organizationId: this.config.usageMetadata.organizationId,
+      ...((this.config.usageMetadata?.organizationName ||
+        this.config.usageMetadata?.organizationId ||
+        this.config.usageMetadata?.organization_id) && {
+        organizationName:
+          this.config.usageMetadata.organizationName ||
+          this.config.usageMetadata.organizationId ||
+          this.config.usageMetadata.organization_id,
       }),
-      ...(this.config.usageMetadata?.productId && {
-        productId: this.config.usageMetadata.productId,
+      ...((this.config.usageMetadata?.productName ||
+        this.config.usageMetadata?.productId ||
+        this.config.usageMetadata?.product_id) && {
+        productName:
+          this.config.usageMetadata.productName ||
+          this.config.usageMetadata.productId ||
+          this.config.usageMetadata.product_id,
       }),
       ...(this.config.usageMetadata?.subscriptionId && {
         subscriptionId: this.config.usageMetadata.subscriptionId,

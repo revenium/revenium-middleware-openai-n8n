@@ -26,8 +26,18 @@ export interface UsageMetadata {
   subscriberCredentialName?: string;
   subscriberCredential?: string;
   subscriberId?: string;
+  organizationName?: string;
+  /**
+   * @deprecated Use organizationName instead. This field will be removed in a future version.
+   * Organization or company identifier
+   */
   organizationId?: string;
   subscriptionId?: string;
+  productName?: string;
+  /**
+   * @deprecated Use productName instead. This field will be removed in a future version.
+   * Product or application identifier
+   */
   productId?: string;
   responseQualityScore?: number; // 0..10
 
@@ -75,8 +85,8 @@ export interface CreateCompletionRequest {
   cacheCreationTokenCount: number;
   cacheReadTokenCount: number;
   totalTokenCount: number;
-  organizationId?: string;
-  productId?: string;
+  organizationName?: string;
+  productName?: string;
   subscriber?: SubscriberInfo;
   middlewareSource: string;
   subscriptionId?: string;
