@@ -682,11 +682,15 @@ function buildCompletionRequest(
     usageMetadata.taskType || usageMetadata.task_type
   );
   const agent = sanitizeStringField(usageMetadata.agent);
-  const organizationId = sanitizeStringField(
-    usageMetadata.organizationId || usageMetadata.organization_id
+  const organizationName = sanitizeStringField(
+    usageMetadata.organizationName ||
+      usageMetadata.organizationId ||
+      usageMetadata.organization_id
   );
-  const productId = sanitizeStringField(
-    usageMetadata.productId || usageMetadata.product_id
+  const productName = sanitizeStringField(
+    usageMetadata.productName ||
+      usageMetadata.productId ||
+      usageMetadata.product_id
   );
   const subscriptionId = sanitizeStringField(
     usageMetadata.subscriptionId || usageMetadata.subscription_id
@@ -735,8 +739,8 @@ function buildCompletionRequest(
         : 0,
     ...(taskType ? { taskType } : {}),
     ...(agent ? { agent } : {}),
-    ...(organizationId ? { organizationId } : {}),
-    ...(productId ? { productId } : {}),
+    ...(organizationName ? { organizationName } : {}),
+    ...(productName ? { productName } : {}),
     ...(subscriptionId ? { subscriptionId } : {}),
     ...(traceId ? { traceId } : {}),
     ...(usageMetadata.responseQualityScore !== undefined &&
