@@ -2,7 +2,6 @@
   "name": "n8n-nodes-revenium",
   "version": "0.1.8",
   "description": "n8n community node for OpenAI ChatCompletion with automatic Revenium usage tracking",
-  "type": "module",
   "keywords": [
     "n8n-community-node-package",
     "n8n",
