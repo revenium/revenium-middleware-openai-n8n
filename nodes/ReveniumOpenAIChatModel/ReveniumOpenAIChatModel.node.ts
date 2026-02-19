@@ -888,16 +888,29 @@ class ReveniumTrackedChatOpenAI extends ChatOpenAI {
     if (this.reveniumCredentials.usageMetadata?.taskType) {
       metadata.taskType = this.reveniumCredentials.usageMetadata.taskType;
     }
-    if (this.reveniumCredentials.usageMetadata?.organizationId) {
-      metadata.organizationId =
-        this.reveniumCredentials.usageMetadata.organizationId;
+    if (
+      this.reveniumCredentials.usageMetadata?.organizationName ||
+      this.reveniumCredentials.usageMetadata?.organizationId ||
+      this.reveniumCredentials.usageMetadata?.organization_id
+    ) {
+      metadata.organizationName =
+        this.reveniumCredentials.usageMetadata.organizationName ||
+        this.reveniumCredentials.usageMetadata.organizationId ||
+        this.reveniumCredentials.usageMetadata.organization_id;
     }
     if (this.reveniumCredentials.usageMetadata?.subscriptionId) {
       metadata.subscriptionId =
         this.reveniumCredentials.usageMetadata.subscriptionId;
     }
-    if (this.reveniumCredentials.usageMetadata?.productId) {
-      metadata.productId = this.reveniumCredentials.usageMetadata.productId;
+    if (
+      this.reveniumCredentials.usageMetadata?.productName ||
+      this.reveniumCredentials.usageMetadata?.productId ||
+      this.reveniumCredentials.usageMetadata?.product_id
+    ) {
+      metadata.productName =
+        this.reveniumCredentials.usageMetadata.productName ||
+        this.reveniumCredentials.usageMetadata.productId ||
+        this.reveniumCredentials.usageMetadata.product_id;
     }
     if (this.reveniumCredentials.usageMetadata?.agent) {
       metadata.agent = this.reveniumCredentials.usageMetadata.agent;

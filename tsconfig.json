@@ -113,7 +113,18 @@
   },
   "include": [
     "credentials/**/*",
-    "nodes/**/*"
+    "nodes/**/*",
+    "src/index.ts",
+    "src/tool-context.ts",
+    "src/tool-tracker.ts",
+    "src/types/**/*",
+    "src/utils/index.ts",
+    "src/utils/logger.ts",
+    "src/utils/url-builder.ts",
+    "src/utils/prompt-extraction.ts",
+    "src/utils/validation/**/*",
+    "src/utils/error-handling/**/*",
+    "src/constants/**/*"
   ],
   "exclude": [
     "node_modules",

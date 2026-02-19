@@ -16,3 +16,6 @@ export * from './n8n.js';
 export * from './bachConfig.js';
 export * from './circuitBreaker.js';
 export * from './rateLimit.js';
+
+// Re-export tool metering types
+export * from './tool-metering.js';
