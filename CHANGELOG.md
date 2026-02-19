@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2026-02-19
+
+### Added
+
+- Tool metering support (meterTool, reportToolCall, setToolContext)
+- outputFields feature for automatic result extraction
+- Fetch timeout to sendToolEvent
+
+### Fixed
+
+- meterTool sync throw and DRY violation in reportToolCall
+
+## [0.1.7] - 2026-02-06
+
+### Added
+
+- Public allowlist for npm publishing
+
 ## [0.1.6] - 2026-01-21
 
 ### Added

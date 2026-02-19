@@ -1,7 +1,4 @@
-import type {
-  ICredentialType,
-  INodeProperties,
-} from 'n8n-workflow';
+import type { ICredentialType, INodeProperties } from 'n8n-workflow';
 
 export class ReveniumOpenAI implements ICredentialType {
   name = 'reveniumOpenAI';
@@ -10,7 +7,8 @@ export class ReveniumOpenAI implements ICredentialType {
 
   icon = 'file:ReveniumOpenAIChatModel/ReveniumOpenAI-v2.png' as const;
 
-  documentationUrl = 'https://github.com/revenium/revenium-middleware-openai-n8n';
+  documentationUrl =
+    'https://github.com/revenium/revenium-middleware-openai-n8n';
 
   properties: INodeProperties[] = [
     {
@@ -30,7 +28,8 @@ export class ReveniumOpenAI implements ICredentialType {
       type: 'string',
       default: 'https://api.openai.com/v1',
       required: false,
-      description: 'The base URL for OpenAI API (default: https://api.openai.com/v1)',
+      description:
+        'The base URL for OpenAI API (default: https://api.openai.com/v1)',
     },
     {
       displayName: 'Revenium Metering API Key',
@@ -50,6 +49,37 @@ export class ReveniumOpenAI implements ICredentialType {
       required: true,
       default: 'https://api.revenium.ai',
       description: 'Revenium API base URL (default: https://api.revenium.ai)',
+    },
+    {
+      displayName: 'Print Summary',
+      name: 'printSummary',
+      type: 'options',
+      options: [
+        {
+          name: 'Disabled',
+          value: false,
+        },
+        {
+          name: 'Human Readable',
+          value: 'human',
+        },
+        {
+          name: 'JSON',
+          value: 'json',
+        },
+      ],
+      default: false,
+      required: false,
+      description:
+        'Print usage summary to console after each request (disabled by default)',
+    },
+    {
+      displayName: 'Team ID',
+      name: 'teamId',
+      type: 'string',
+      default: '',
+      required: false,
+      description: 'Your Revenium Team ID for cost retrieval (optional)',
     },
   ];
 }
