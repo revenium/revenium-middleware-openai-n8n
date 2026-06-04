@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-revenium",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "n8n community node for OpenAI ChatCompletion with automatic Revenium usage tracking",
   "keywords": [
     "n8n-community-node-package",
@@ -24,6 +24,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/revenium/revenium-middleware-openai-n8n.git"
+  },
+  "bugs": {
+    "url": "https://github.com/revenium/revenium-middleware-openai-n8n/issues"
   },
   "main": "index.js",
   "scripts": {

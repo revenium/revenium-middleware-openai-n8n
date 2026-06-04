@@ -1323,11 +1323,11 @@ export class ReveniumOpenAIChatModel implements INodeType {
             description: 'The credential value used by the subscriber',
           },
           {
-            displayName: 'Organization ID',
-            name: 'organizationId',
+            displayName: 'Organization Name',
+            name: 'organizationName',
             type: 'string',
             default: '',
-            description: 'Customer or department ID from non-Revenium systems',
+            description: 'Customer or department name from non-Revenium systems',
           },
           {
             displayName: 'Subscription ID',
@@ -1337,8 +1337,8 @@ export class ReveniumOpenAIChatModel implements INodeType {
             description: 'Reference to a billing plan in non-Revenium systems',
           },
           {
-            displayName: 'Product ID',
-            name: 'productId',
+            displayName: 'Product Name',
+            name: 'productName',
             type: 'string',
             default: '',
             description: 'Your product or feature making the AI call',

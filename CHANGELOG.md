@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2026-06-04
+
+### Changed
+
+- Map cached tokens as cache reads in token usage logging
+- Rename n8n UI fields from organizationId/productId to organizationName/productName
+
+### Documentation
+
+- Rewrite README aligning with Anthropic n8n template
+- Standardize README sections and add bugs field to package.json
+
 ## [0.1.8] - 2026-02-19
 
 ### Added
@@ -80,3 +92,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cost and performance metrics monitoring
 - Fire-and-forget async tracking (non-blocking)
 - Circuit breaker for Revenium API resilience
+
+[0.1.9]: https://github.com/revenium/revenium-middleware-openai-n8n/releases/tag/v0.1.9
